@@ -12,6 +12,28 @@ jobs:
       - name: Kodu al
         uses: actions/checkout@v4
 
+      - name: Proje zip'ini aç
+        run: |
+          ZIPFILE=$(ls *.zip | head -n 1)
+          echo "Açılan zip: $ZIPFILE"
+          unzip -o "$ZIPFILE" -d extracted
+
+      - name: Proje klasörünü bul
+        id: findproj
+        run: |
+          PROJDIR=$(find extracted -maxdepth 4 -name "settings.gradle.kts" -exec dirname {} \; | head -n 1)
+          echo "Bulunan proje klasörü: $PROJDIR"
+          echo "dir=$PROJDIR" >> "$GITHUB_OUTPUT"
+
+      - name: Oyun kodunu (varsa) yerine koy
+        run: |
+          if [ -f "game.html" ]; then
+            echo "game.html bulundu, index.html yerine kopyalanıyor."
+            cp game.html "${{ steps.findproj.outputs.dir }}/app/src/main/assets/index.html"
+          else
+            echo "game.html yok, placeholder ekranla derlenecek."
+          fi
+
       - name: JDK 17 kur
         uses: actions/setup-java@v4
         with:
@@ -25,9 +47,10 @@ jobs:
 
       - name: Debug APK derle
         run: gradle assembleDebug --no-daemon
+        working-directory: ${{ steps.findproj.outputs.dir }}
 
       - name: APK'yı artifact olarak yükle
         uses: actions/upload-artifact@v4
         with:
           name: Oyun-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: ${{ steps.findproj.outputs.dir }}/app/build/outputs/apk/debug/app-debug.apk
